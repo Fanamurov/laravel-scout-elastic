@@ -140,7 +140,10 @@ class ElasticsearchEngine extends Engine
             'size' => $perPage,
         ]);
 
-        $result['nbPages'] = $result['hits']['total'] / $perPage;
+        // BUGFIX BY FANAMUROV
+        $result['nbPages'] = $result['hits']['total']['value'] / $perPage;
+        $result['hits']['total'] = $result['hits']['total']['value'];
+        // END BUGFIX BY FANAMUROV
 
         return $result;
     }
@@ -154,7 +157,29 @@ class ElasticsearchEngine extends Engine
      */
     protected function performSearch(Builder $builder, array $options = [])
     {
+        // BUGFIX FOR INT SEARCH BY FANAMUROV
+        $int_check = (int)$builder->query;
+
+        if (strlen($int_check) === strlen($builder->query)) {
+            $query = $builder->query;
+        } else {
+            $query = '*' . $builder->query . '*';
+        }
+
         $params = [
+            'index' => $builder->model->searchableAs(),
+            'type' => get_class($builder->model),
+            'body' => [
+                'query' => [
+                    'bool' => [
+                        'must' => [['query_string' => ['query' => "{$query}"]]]
+                    ]
+                ]
+            ]
+        ];
+        // END BUGFIX FOR INT SEARCH BY FANAMUROV
+        
+        /*$params = [
             'index' => $builder->model->searchableAs(),
             'type' => get_class($builder->model),
             'body' => [
@@ -164,7 +189,7 @@ class ElasticsearchEngine extends Engine
                     ]
                 ]
             ]
-        ];
+        ];*/
 
         if ($sort = $this->sort($builder)) {
             $params['body']['sort'] = $sort;
